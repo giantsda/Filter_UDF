@@ -55,8 +55,8 @@ DEFINE_DPM_SCALAR_UPDATE(dpm_udf,c,t,initialize,p)
 	Thread * filter_thread=Lookup_Thread(domain,8); // 
 	if(t==filter_thread)
 	{
-		printf("UDF 1: particle %d is currently in cell: %d,\
-		position: %f,%f,%f, current particle time=%f on node %d\n",p->part_id, c,P_POS(p)[0],P_POS(p)[1],P_POS(p)[2],P_TIME(p),myid);
+		printf("particle %d in cell: %d,\
+		position: %f,%f,%f, current time=%f on node %d\n",p->part_id, c,P_POS(p)[0],P_POS(p)[1],P_POS(p)[2],P_TIME(p),myid);
 		cell_status[c]++;
 		p->stream_index = -1; 
 		p->gvtp.n_aborted++; // once a particle reaches the filter, it is marked as aborted.
@@ -66,8 +66,42 @@ DEFINE_DPM_SCALAR_UPDATE(dpm_udf,c,t,initialize,p)
 
 DEFINE_ON_DEMAND(print_cell_status)
 {
-	for (int i=0;i<number_of_cells;i++)
-		printf("cell_status[%d]=%d; \n",i,cell_status[i]);
+	//for (int i=0;i<number_of_cells;i++)
+		//printf("cell_status[%d]=%d; \n",i,cell_status[i]);
+	// writting cell_status file
+	//FILE *fp = NULL;
+	
+	if (!RP_HOST)
+	{
+	Domain * domain=Get_Domain(1);  // 1 is for single phase
+	Thread * thread=Lookup_Thread(domain,8); // 		
+	char filename[256];
+    strcpy (filename,"cell_status_node");
+	char snum[64];
+	sprintf(snum, "%d", myid);
+	strcat (filename,snum);
+	strcat (filename,".txt");
+	FILE* fp=fopen(filename,"w");
+	if (fp==NULL)
+		printf("ERROR: Unable to open %s\n",filename);
+	else
+		printf("writing local data to %s on node %d\n",filename,myid);
+ // Loop over cells on filter
+ 	real x[ND_ND];
+	cell_t c;
+	begin_c_loop(c,thread)
+		{
+			C_CENTROID(x,c,thread);
+			fprintf(fp,"%f,%f,%f,%d\n",x[0],x[1],x[2],cell_status[c]);
+		}
+	end_c_loop(f,t);
+	fclose(fp);
+	
+	
+	 
+	fflush(stdout); 
+	}
+
 }
 
 
