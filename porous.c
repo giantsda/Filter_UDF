@@ -47,7 +47,7 @@ double base_vr=3.7822e+10;
 		else
 			cell_vr=1; */
 		cell_vr=base_vr*(1+filter_cell_status[c]/10);
-		C_UDSI(c,t,1)=cell_vr;
+//		C_UDSI(c,t,1)=cell_vr;
 		F_PROFILE(c,t,i)=cell_vr;
 	}
 	end_c_loop(c,t)
@@ -61,6 +61,7 @@ DEFINE_DPM_SCALAR_UPDATE(dpm_udf,c,t,initialize,p)
 	if(t==filter_thread)
 	{
 		//printf("particle %d in cell: %d,position: %f,%f,%f, current time=%f on node %d\n",p->part_id, c,P_POS(p)[0],P_POS(p)[1],P_POS(p)[2],P_TIME(p),myid);
+		if (filter_cell_status[c]<=300)
 		filter_cell_status[c]++;
 		p->stream_index = -1; 
 		p->gvtp.n_aborted++; // once a particle reaches the filter, it is marked as aborted.
@@ -77,6 +78,7 @@ DEFINE_EXECUTE_AT_END(set_UDS)
 	begin_c_loop(c,thread)
 		{
 			C_UDSI(c,thread,0)=filter_cell_status[c];
+			C_UDSI(c,thread,1)=1.;
 		}
 	end_c_loop(c,Thread);
 	printf("UDS_0 is set \n");
