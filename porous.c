@@ -4,7 +4,7 @@ int n=0,max_state=100;
 int number_of_cells;
 double eps=1e-8;
 double node_x[2],node_z[2]; // node_x stores the smallest and largest value of all node x component.
-int* filter_cell_status;
+double* filter_cell_status;
 int filter_ID=6;
 double base_vr=3.7822e+10;
 
@@ -25,11 +25,11 @@ double base_vr=3.7822e+10;
 		}
 	end_c_loop(f,t);
 	printf("number_of_cells=%d on node:%d <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n",number_of_cells,myid);
-	filter_cell_status=(int*)malloc(sizeof(int)*number_of_cells);
+	filter_cell_status=(double*)malloc(sizeof(double)*number_of_cells);
 	printf("memory is allocated from node %d\n",myid);
 	for (int i=0;i<number_of_cells;i++)
 	{
-		filter_cell_status[i]=0;
+		filter_cell_status[i]=0.;
 	}
 	fflush(stdout); 
 }
@@ -46,7 +46,7 @@ double base_vr=3.7822e+10;
 			cell_vr=base_vr;
 		else
 			cell_vr=1; */
-		cell_vr=filter_cell_status[c]*base_vr;
+		cell_vr=base_vr*(1+filter_cell_status[c]/10);
 		C_UDSI(c,t,1)=cell_vr;
 		F_PROFILE(c,t,i)=cell_vr;
 	}
@@ -68,7 +68,8 @@ DEFINE_DPM_SCALAR_UPDATE(dpm_udf,c,t,initialize,p)
 	fflush(stdout); 
 }
 
-DEFINE_ON_DEMAND(set_UDS)
+ 
+DEFINE_EXECUTE_AT_END(set_UDS)
 {
 	Domain * domain=Get_Domain(1);  // 1 is for single phase
 	Thread * thread=Lookup_Thread(domain,filter_ID); // 	
@@ -78,12 +79,11 @@ DEFINE_ON_DEMAND(set_UDS)
 			C_UDSI(c,thread,0)=filter_cell_status[c];
 		}
 	end_c_loop(c,Thread);
+	printf("UDS_0 is set \n");
 }
-
 
 DEFINE_ON_DEMAND(print_cell_status)
 {
-
 	if (!RP_HOST)
 	{
 	Domain * domain=Get_Domain(1);  // 1 is for single phase
@@ -111,7 +111,6 @@ DEFINE_ON_DEMAND(print_cell_status)
 	fclose(fp);
 	fflush(stdout); 
 	}
-
 }
 
 
