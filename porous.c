@@ -2,13 +2,11 @@
 
 int n=0,max_state=100;
 int number_of_cells;
-double eps=1e-8;
-double node_x[2],node_z[2]; // node_x stores the smallest and largest value of all node x component.
 double* filter_cell_status;
 double* current_add;
 int filter_ID=6;
 double base_vr=3.7822e+10;
-int allowed_hit_one_step=20;
+int allowed_hit_one_step=5;
 
 int Probablity(double p);
 
@@ -17,7 +15,6 @@ int Probablity(double p);
 	number_of_cells=0;
 	Domain * domain=Get_Domain(1);  // 1 is for single phase
 	Thread * thread=Lookup_Thread(domain,filter_ID); // 
-	int zone_ID=	 THREAD_ID(thread);
 	real x[ND_ND];
 	cell_t c;
 	begin_c_loop(c,thread)
@@ -41,18 +38,11 @@ int Probablity(double p);
  
   DEFINE_PROFILE(change_vis_res,t,i)
 {
-	//printf("number_of_cells=%d \n",number_of_cells);
      cell_t c;
 	 real x[ND_ND],cell_vr;
 	begin_c_loop(c,t)
-	{
-		/* C_CENTROID(x,c,t);
-		if (x[0]<0.0704966)
-			cell_vr=base_vr;
-		else
-			cell_vr=1; */
-		cell_vr=base_vr*(1+filter_cell_status[c]/50);
-//		C_UDSI(c,t,1)=cell_vr;
+	{	
+		cell_vr=base_vr*(1+filter_cell_status[c]/3000*10);
 		F_PROFILE(c,t,i)=cell_vr;
 	}
 	end_c_loop(c,t)
@@ -62,16 +52,15 @@ int Probablity(double p);
 DEFINE_DPM_SCALAR_UPDATE(dpm_udf,c,t,initialize,p)
 {
 	Domain * domain=Get_Domain(1);  // 1 is for single phase
-	Thread * filter_thread=Lookup_Thread(domain,filter_ID); // 
+	Thread * filter_thread=Lookup_Thread(domain,filter_ID); //
 	if(t==filter_thread)
 	{
 		//printf("particle %d in cell: %d,position: %f,%f,%f, current time=%f on node %d\n",p->part_id, c,P_POS(p)[0],P_POS(p)[1],P_POS(p)[2],P_TIME(p),myid);
-		if (filter_cell_status[c]<300 && current_add[c]<allowed_hit_one_step)
+		if (filter_cell_status[c]<3000 && current_add[c]<allowed_hit_one_step && N_TIME%1==0) // The max allowed hit per cell, and max allowed hits per time 
 		{
 			filter_cell_status[c]++;
 			current_add[c]++;
 		}
-		
 		p->stream_index = -1; 
 		p->gvtp.n_aborted++; // once a particle reaches the filter, it is marked as aborted.
 	}
@@ -136,6 +125,7 @@ DEFINE_ON_DEMAND(print_cell_status)
 
 DEFINE_ON_DEMAND(random_number_generator)
 {
+	printf("current is %f,  time step=%d,   on node %d \n", CURRENT_TIME,N_TIME,myid);
  	if(myid==0)
 	{
 		for(int i = 0; i<100; i++)
@@ -149,6 +139,7 @@ DEFINE_ON_DEMAND(random_number_generator)
 	}
 	fflush(stdout); 
 }
+
 
 
 int Probablity(double p)
