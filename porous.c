@@ -10,19 +10,18 @@
 
 #include "udf.h"
 
-// Global data
+/* Global data */
 int max_state = 3000;
 int number_filter_cells;
 double* filter_cell_status;
 double* current_add;
 int filter_ID = 6;
-double base_vr = 3.7822e+10;
+double base_vr = 3.7822e+10, lost_percent=0.99;
 int allowed_hit_one_step = 5;
-Injection * injection; // I need to pass it to DEFINE_EXECUTE_AT_END
-double x0 = 0.07054139, y0 = 0.049, z0 = 0., r = 0.000985; /* defines the origin for random particle injection
- check r value for finer mesh */
+Injection * injection; /* I need to pass it to DEFINE_EXECUTE_AT_END */
+double my_x0 = 0.07054139, my_y0 = 0.049, my_z0 = 0., r = 0.000985; /* defines the origin for random particle injection check r value for finer mesh y0 was defined somewhere else .. */
 
-// Function prototype
+/* Function prototype */
 int
 Probablity (double p);
 
@@ -33,8 +32,8 @@ DEFINE_EXECUTE_ON_LOADING(Initialize, libname)
 	3. initialize filter_cell_status. 
 	4. set seed for random number generator */
   number_filter_cells = 0;
-  Domain * domain = Get_Domain (1);  // 1 is for single phase
-  Thread * thread = Lookup_Thread (domain, filter_ID); //
+  Domain * domain = Get_Domain (1);  /* 1 is for single phase */
+  Thread * thread = Lookup_Thread (domain, filter_ID); 
   cell_t c;
   begin_c_loop (c, thread)
     {
@@ -45,30 +44,31 @@ DEFINE_EXECUTE_ON_LOADING(Initialize, libname)
 	  number_filter_cells, myid);
   filter_cell_status = (double*) malloc (sizeof(double) * number_filter_cells);
   current_add = (double*) malloc (sizeof(double) * number_filter_cells);
-  for (int i = 0; i < number_filter_cells; i++) // initialize filter_cell_status
+  int i;
+  for (i = 0; i < number_filter_cells; i++) /* initialize filter_cell_status */
     {
       filter_cell_status[i] = 0.;
     }
-  srand (time (0) + myid * 123);  // set seed for random number
+  srand (time (0) + myid * 123);  /* set seed for random number */
   fflush (stdout);
 }
 
 DEFINE_DPM_SCALAR_UPDATE(set_filter_cell_status, c, t, initialize, p) 
 {
 	/* 1.set_filter_cell_status once a particle hits the filter*/
-  Domain * domain = Get_Domain (1);  // 1 is for single phase
+  Domain * domain = Get_Domain (1);  /* 1 is for single phase */
   Thread * filter_thread = Lookup_Thread (domain, filter_ID);
-  if (t == filter_thread) // Thread comparison. True if the particle is in the filter.
+  if (t == filter_thread) /* Thread comparison. True if the particle is in the filter. */
     {
-      //printf("particle %d in cell: %d,position: %f,%f,%f, current time=%f on node %d\n",p->part_id, c,P_POS(p)[0],P_POS(p)[1],P_POS(p)[2],P_TIME(p),myid);
+      /*printf("particle %d in cell: %d,position: %f,%f,%f, current time=%f on node %d\n",p->part_id, c,P_POS(p)[0],P_POS(p)[1],P_POS(p)[2],P_TIME(p),myid); */
       if (filter_cell_status[c] < max_state
-	  && current_add[c] < allowed_hit_one_step && N_TIME % 1 == 0) // The max allowed hit per cell, and max allowed hits per time
+	  && current_add[c] < allowed_hit_one_step && N_TIME % 1 == 0) /* The max allowed hit per cell, and max allowed hits per time */
 	{
 	  filter_cell_status[c]++;
 	  current_add[c]++;
 	}
       p->stream_index = -1;
-      p->gvtp.n_aborted++; // once a particle reaches the filter, it is marked as aborted.
+      p->gvtp.n_aborted++; /* once a particle reaches the filter, it is marked as aborted. */
     }
   fflush (stdout);
 }
@@ -80,7 +80,7 @@ DEFINE_PROFILE(change_vis_res, t, i)
   real cell_vr;
   begin_c_loop (c, t)
     {
-      cell_vr = base_vr * (1 + filter_cell_status[c] / max_state * 10); //if the cell got max hit, the vr is 11 times of the base_vr
+      cell_vr = base_vr * (1 + filter_cell_status[c] / max_state * 10); /* if the cell got max hit, the vr is 11 times of the base_vr */
       F_PROFILE (c, t, i) = cell_vr;
     }
   end_c_loop (c, t)
@@ -91,26 +91,26 @@ DEFINE_DPM_INJECTION_INIT(random_injection, I)
 {
 	/* 1. generate random position for injection. 2.Pass I for further use.*/
 	
-  // printf("Executed at time step %d from node %d \n",N_TIME,myid);
+  /* printf("Executed at time step %d from node %d \n",N_TIME,myid); */
   Particle *p;
   injection = I;
   loop (p, I->p_init)
   /* Standard Fluent Looping Macro to get particle. >> p_init << for transient mode,p for SS */
     {
-      double x = 2000., y = 2000., z = 2000.; // make sure it is out of the domain initially.
-      if (Probablity (0.9))  //80 percent particle is going to be deleted.
-	p->stream_index = -1;  // delete particle.
-      else 			// if not deleted, its position is regenerated.
+      double x = 2000., y = 2000., z = 2000.; /* make sure it is out of the domain initially. */
+      if (Probablity (lost_percent))  /* 99 percent particle is going to be deleted. */
+	p->stream_index = -1;  /*  delete particle. */
+      else 			/* if not deleted, its position is regenerated. */
 	{
-	  while (sqrt (pow (x - x0, 2) + pow (z - z0, 2)) >= r) // while it is out of the domain
+	  while (sqrt (pow (x - my_x0, 2) + pow (z - my_z0, 2)) >= r) /* while it is out of the domain */
 	    {
-	      x = x0
+	      x = my_x0
 		  + (double) rand () / (double) ((unsigned) RAND_MAX + 1) * 2
-		      * r - r;  // from -0.001 to 0.001
-	      y = y0
+		      * r - r;  /* from -0.001 to 0.001 */
+	      y = my_y0
 		  + (double) rand () / (double) ((unsigned) RAND_MAX + 1) * 2
-		      * r * 0.2 - 0.2 * r; // vertical locations are allowed to move by 0.2r
-	      z = z0
+		      * r * 0.2 - 0.2 * r; /* vertical locations are allowed to move by 0.2r */
+	      z = my_z0
 		  + (double) rand () / (double) ((unsigned) RAND_MAX + 1) * 2
 		      * r - r;
 	    }
@@ -128,8 +128,8 @@ DEFINE_EXECUTE_AT_END(set_UDS)
 	UDS_2 denotes it is in the filter or not. 
 	2. restore deleted particles. 
 	3. reinitialize current_add */
-  Domain * domain = Get_Domain (1);  // 1 is for single phase
-  Thread * thread = Lookup_Thread (domain, filter_ID); //
+  Domain * domain = Get_Domain (1);  /* 1 is for single phase */
+  Thread * thread = Lookup_Thread (domain, filter_ID); 
   cell_t c;
   begin_c_loop (c, thread)
     {
@@ -137,24 +137,19 @@ DEFINE_EXECUTE_AT_END(set_UDS)
       C_UDSI (c, thread, 1) = 1.;
     }
   end_c_loop (c, Thread);
-
-//  if (RP_HOST)
-//    printf ("\n>>> UDS_0 is set \n");
-
-  for (int i = 0; i < number_filter_cells; i++)
+ 
+ int i;
+  for (i = 0; i < number_filter_cells; i++)
     {
       current_add[i] = 0;
     }
-
-//  if (RP_HOST)
-//    printf (">>> current_add is clear to 0\n");
-
-  if (!RP_HOST) // have to add it because host node does not have data on it!
+ 
+  if (!RP_HOST) /* have to add it because host node does not have data on it! */
     {
       Particle *p;
       loop (p, injection->p_init)
 	{
-	  p->stream_index = p->part_id; // recover deleted particles.I think it is OK for any position int.
+	  p->stream_index = p->part_id; /* recover deleted particles.I think it is OK for any position int. */
 	}
     }
   fflush (stdout);
@@ -164,8 +159,8 @@ DEFINE_ON_DEMAND(fprint_cell_status) /* print cell status to files */
 {
   if (!RP_HOST)
     {
-      Domain * domain = Get_Domain (1);  // 1 is for single phase
-      Thread * thread = Lookup_Thread (domain, filter_ID); //
+      Domain * domain = Get_Domain (1);  /* 1 is for single phase */
+      Thread * thread = Lookup_Thread (domain, filter_ID); 
       char filename[256];
       strcpy (filename, "filter_cell_status_node_");
       char snum[64];
@@ -177,13 +172,13 @@ DEFINE_ON_DEMAND(fprint_cell_status) /* print cell status to files */
 	printf ("ERROR: Unable to open %s\n", filename);
       else
 	printf ("writing local data to %s on node %d\n", filename, myid);
-      // Loop over cells on filter
+      /* Loop over cells on filter */
       real x[ND_ND];
       cell_t c;
       begin_c_loop (c, thread)
 	{
 	  C_CENTROID (x, c, thread);
-	  fprintf (fp, "%f,%f,%f,%d\n", x[0], x[1], x[2],
+	  fprintf (fp, "%f,%f,%f,%f\n", x[0], x[1], x[2],
 		   filter_cell_status[c]);
 	}
       end_c_loop (c, thread);
@@ -194,7 +189,8 @@ DEFINE_ON_DEMAND(fprint_cell_status) /* print cell status to files */
 
 DEFINE_ON_DEMAND(random_number_generator) /* for debugging */
 {
-  /*	printf("current is %f,  time step=%d,   on node %d \n", CURRENT_TIME,N_TIME,myid);
+  /*	
+  printf("current is %f,  time step=%d,   on node %d \n", CURRENT_TIME,N_TIME,myid);
    //if(myid==0)
    {
    for(int i = 0; i<100; i++)
@@ -215,7 +211,7 @@ DEFINE_ON_DEMAND(random_number_generator) /* for debugging */
 
       loop (p, injection->p)
 	{
-	  printf ("particle %d stream index=%d\n", p->part_id, p->stream_index);
+	  printf ("particle %d stream index=%d\n", p->part_id, (int) p->stream_index);
 	  p->stream_index = p->part_id;
 	}
     }
