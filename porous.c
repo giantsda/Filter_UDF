@@ -16,7 +16,7 @@ int number_filter_cells;
 double* filter_cell_status;
 double* current_add;
 int filter_ID = 6;
-double base_vr = 3.7822e+10, lost_percent= 0.99698;
+double base_vr = 3.7822e+10, lost_percent= 0.99698189;
 int allowed_hit_one_step = 5;
 Injection * injection; /* I need to pass it to DEFINE_EXECUTE_AT_END */
 double my_x0 = 0.07054139, my_y0 = 0.049, my_z0 = 0., r = 0.000985; /* defines the origin for random particle injection check r value for finer mesh y0 was defined somewhere else .. */

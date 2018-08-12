@@ -1,5 +1,5 @@
-rc 15_US_0.cas
-rd 15_US_0.dat
+rc 16_LES_start.cas
+rd 16_LES_start.dat
 
 /define/user-defined/compiled-functions
 compile
@@ -111,7 +111,7 @@ cfdpost
 
 
 q
-2
+4
 0
 
 /define/materials/change-create
@@ -131,7 +131,7 @@ q
 y
 y
 "export-1"
-2
+4
 flow-time
 6
 
@@ -146,8 +146,8 @@ flow-time
 6
 /solve/dual-time-iterate
 1000000
-20
+50
 
 
-exit;
-yes;
+exit
+yes
